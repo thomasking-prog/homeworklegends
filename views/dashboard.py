@@ -2,18 +2,14 @@
 
 import customtkinter as ctk
 
-from views.classroom_create import ClassroomCreateWindow
+from views import EvaluationWindow, HomeworkWindow
+from views.admin.classroom_create import ClassroomCreateWindow
 from views.classroom_join import ClassroomJoinWindow
-from views.classroom_requests import ClassroomRequestWindow
+from views.delegate.classroom_requests import ClassroomRequestWindow
 from views.subject_manage import SubjectManageWindow
 from views.subject_follow import SubjectFollowWindow
-from views.evaluation_create import EvaluationCreateWindow
-from views.evaluation_list import EvaluationListWindow
-from views.homework_create import HomeworkCreateWindow
-from views.homework_todolist import HomeworkTodoListWindow
-from views.homework_grade import HomeworkGradeWindow
-from views.notes_chart import NotesChartWindow
-from views.rank_manager import RankManagerWindow
+from views.grades.notes_chart import NotesChartWindow
+from views.admin.rank_manager import RankManagerWindow
 
 
 class Dashboard(ctk.CTkToplevel):
@@ -75,10 +71,6 @@ class Dashboard(ctk.CTkToplevel):
         self.btn_follow_subjects = ctk.CTkButton(self, text="My Subjects", command=self.open_subject_follow)
         self.btn_follow_subjects.pack(pady=5)
 
-        # Add Evaluation button
-        self.btn_eval = ctk.CTkButton(self, text="Add Evaluation", command=self.open_evaluation)
-        self.btn_eval.pack(pady=5)
-
         # View Evaluations button
         self.btn_list_eval = ctk.CTkButton(self, text="View Evaluations", command=self.open_eval_list)
         self.btn_list_eval.pack(pady=5)
@@ -87,16 +79,8 @@ class Dashboard(ctk.CTkToplevel):
         self.btn_join_class = ctk.CTkButton(self, text="Join Classroom", command=self.open_join_class)
         self.btn_join_class.pack(pady=10)
 
-        # Create Homework button
-        self.btn_homework = ctk.CTkButton(self, text="Create Homework", command=self.open_homework)
-        self.btn_homework.pack(pady=5)
-
-        # List Homework button
-        self.btn_todolist = ctk.CTkButton(self, text="ToDo List", command=self.open_todolist)
-        self.btn_todolist.pack(pady=5)
-
         # Grade Homework button
-        self.btn_grade_hw = ctk.CTkButton(self, text="Grade Homework", command=self.open_grade_hw)
+        self.btn_grade_hw = ctk.CTkButton(self, text="Homework", command=self.open_grade_hw)
         self.btn_grade_hw.pack(pady=5)
 
         # Notes Chart button
@@ -122,19 +106,10 @@ class Dashboard(ctk.CTkToplevel):
         NotesChartWindow(self, self.current_user)
 
     def open_grade_hw(self):
-        HomeworkGradeWindow(self, self.current_user)
-
-    def open_todolist(self):
-        HomeworkTodoListWindow(self, self.current_user)
-
-    def open_homework(self):
-        HomeworkCreateWindow(self, self.current_user)
+        HomeworkWindow(self, self.current_user)
 
     def open_eval_list(self):
-        EvaluationListWindow(self, self.current_user)
-
-    def open_evaluation(self):
-        EvaluationCreateWindow(self, self.current_user)
+        EvaluationWindow(self, self.current_user)
 
     def open_subject_follow(self):
         SubjectFollowWindow(self, self.current_user)

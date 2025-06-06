@@ -1,9 +1,10 @@
-# views/evaluation_list.py (vue tabulaire améliorée)
-
 import customtkinter as ctk
+from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from config import DATABASE_URL
+from utils.ranking import update_user_score, remove_user_score
+from utils.scoring import apply_score_update
 from models.evaluation_note import EvaluationNote
 from models.user import User
 from models.subject import Subject
@@ -11,16 +12,20 @@ from models.subject import Subject
 engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
 
-class EvaluationListWindow(ctk.CTkToplevel):
+class EvaluationWindow(ctk.CTkToplevel):
     def __init__(self, parent, current_user):
         super().__init__(parent)
-        self.title("Your Evaluations")
-        self.geometry("800x600")
+        self.title("Evaluations")
+        self.geometry("900x700")
         self.current_user = current_user
         self.session = Session()
 
-        self.filters_frame = ctk.CTkFrame(self)
-        self.filters_frame.pack(pady=10, padx=10, fill="x")
+        # === Frame filtre + tableau ===
+        self.list_frame = ctk.CTkFrame(self)
+        self.list_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        self.filters_frame = ctk.CTkFrame(self.list_frame)
+        self.filters_frame.pack(fill="x", pady=5)
 
         self.filter_label = ctk.CTkEntry(self.filters_frame, placeholder_text="Filter by label...")
         self.filter_label.pack(side="left", padx=5)
@@ -34,8 +39,47 @@ class EvaluationListWindow(ctk.CTkToplevel):
         self.apply_filter_btn = ctk.CTkButton(self.filters_frame, text="Apply Filters", command=self.render_table)
         self.apply_filter_btn.pack(side="left", padx=5)
 
-        self.table_frame = ctk.CTkScrollableFrame(self)
-        self.table_frame.pack(fill="both", expand=True, padx=10, pady=5)
+        self.table_frame = ctk.CTkScrollableFrame(self.list_frame)
+        self.table_frame.pack(fill="both", expand=True)
+
+        # === Frame formulaire création ===
+        self.form_frame = ctk.CTkFrame(self)
+        self.form_frame.pack(fill="x", padx=10, pady=10)
+
+        # Form fields
+        self.label_label = ctk.CTkLabel(self.form_frame, text="Label:")
+        self.label_label.grid(row=0, column=0, sticky="w", pady=5)
+        self.entry_label = ctk.CTkEntry(self.form_frame)
+        self.entry_label.grid(row=0, column=1, sticky="ew", pady=5)
+
+        self.label_score = ctk.CTkLabel(self.form_frame, text="Score (0-20):")
+        self.label_score.grid(row=1, column=0, sticky="w", pady=5)
+        self.entry_score = ctk.CTkEntry(self.form_frame)
+        self.entry_score.grid(row=1, column=1, sticky="ew", pady=5)
+
+        self.label_date = ctk.CTkLabel(self.form_frame, text="Date (YYYY-MM-DD):")
+        self.label_date.grid(row=2, column=0, sticky="w", pady=5)
+        self.entry_date = ctk.CTkEntry(self.form_frame)
+        self.entry_date.grid(row=2, column=1, sticky="ew", pady=5)
+
+        self.label_coeff = ctk.CTkLabel(self.form_frame, text="Coefficient (default 1):")
+        self.label_coeff.grid(row=3, column=0, sticky="w", pady=5)
+        self.entry_coeff = ctk.CTkEntry(self.form_frame)
+        self.entry_coeff.grid(row=3, column=1, sticky="ew", pady=5)
+        self.entry_coeff.insert(0, "1")
+
+        self.label_subject = ctk.CTkLabel(self.form_frame, text="Subject:")
+        self.label_subject.grid(row=4, column=0, sticky="w", pady=5)
+        self.subject_box = ctk.CTkComboBox(self.form_frame, values=subject_names)
+        self.subject_box.grid(row=4, column=1, sticky="ew", pady=5)
+
+        self.status_label = ctk.CTkLabel(self.form_frame, text="")
+        self.status_label.grid(row=5, column=0, columnspan=2, pady=10)
+
+        self.btn_submit = ctk.CTkButton(self.form_frame, text="Add Evaluation", command=self.submit)
+        self.btn_submit.grid(row=6, column=0, columnspan=2, pady=10)
+
+        self.form_frame.columnconfigure(1, weight=1)
 
         self.render_table()
 
@@ -50,12 +94,10 @@ class EvaluationListWindow(ctk.CTkToplevel):
 
         query = self.session.query(EvaluationNote).filter_by(user_id=self.current_user.id)
 
-        # Filtrage par label
         label_filter = self.filter_label.get().strip().lower()
         if label_filter:
             query = query.filter(EvaluationNote.label.ilike(f"%{label_filter}%"))
 
-        # Filtrage par matière
         selected_subject = self.subject_filter.get()
         if selected_subject != "All":
             subj = next((s for s in self.subjects if s.name == selected_subject), None)
@@ -81,14 +123,21 @@ class EvaluationListWindow(ctk.CTkToplevel):
 
             action_frame = ctk.CTkFrame(self.table_frame, border_width=1, border_color="gray")
             action_frame.grid(row=row_idx, column=5, padx=1, pady=1, sticky="nsew")
+
             btn_edit = ctk.CTkButton(action_frame, text="Edit", width=60, command=lambda nid=note.id: self.edit_evaluation(nid))
             btn_edit.pack(side="left", padx=2, pady=2)
+
             btn_del = ctk.CTkButton(action_frame, text="Delete", fg_color="red", width=60, command=lambda nid=note.id: self.delete_evaluation(nid))
             btn_del.pack(side="right", padx=2, pady=2)
 
     def delete_evaluation(self, note_id):
         note = self.session.query(EvaluationNote).get(note_id)
         if note:
+            user = self.session.query(User).get(self.current_user.id)
+
+            # Retirer l’impact de la note avant suppression
+            remove_user_score(self.session, user, note.score)
+
             self.session.delete(note)
             self.session.commit()
             self.render_table()
@@ -131,9 +180,17 @@ class EvaluationListWindow(ctk.CTkToplevel):
         subject_dropdown.pack(pady=5)
 
         def save_changes():
+            user = self.session.query(User).get(self.current_user.id)
+
+            old_score = note.score
+            new_score = float(entry_score.get())
+
+            # Met à jour score + rank proprement
+            update_user_score(self.session, user, old_score, new_score)
+
+            # Modifie l'évaluation
             note.label = entry_label.get().strip()
-            note.score = float(entry_score.get())
-            from datetime import datetime
+            note.score = new_score
             note.date = datetime.strptime(entry_date.get(), "%Y-%m-%d").date()
             note.coefficient = float(entry_coeff.get())
             subject_name = subject_dropdown.get()
@@ -141,7 +198,51 @@ class EvaluationListWindow(ctk.CTkToplevel):
             if subject:
                 note.subject_id = subject.id
             self.session.commit()
+
             edit_win.destroy()
             self.render_table()
 
         ctk.CTkButton(edit_win, text="Save", command=save_changes).pack(pady=20)
+
+    def submit(self):
+        try:
+            label = self.entry_label.get().strip()
+            score = float(self.entry_score.get())
+            date = datetime.strptime(self.entry_date.get(), "%Y-%m-%d").date()
+            coeff = float(self.entry_coeff.get() or 1)
+            subject_name = self.subject_box.get()
+
+            if not label or not subject_name:
+                raise ValueError("Missing data")
+
+            subject = next((s for s in self.subjects if s.name == subject_name), None)
+            if not subject:
+                raise ValueError("Invalid subject")
+
+            note = EvaluationNote(
+                label=label,
+                score=score,
+                date=date,
+                coefficient=coeff,
+                user_id=self.current_user.id,
+                subject_id=subject.id
+            )
+            self.session.add(note)
+            self.session.flush()  # Génère l'ID et synchronise la session
+
+            user = self.session.query(User).get(self.current_user.id)
+
+            # Applique l'impact du nouveau score
+            apply_score_update(self.session, user, score)
+
+            self.session.commit()
+            self.session.refresh(user)
+
+            self.status_label.configure(text="Evaluation added!", text_color="green")
+            self.entry_label.delete(0, "end")
+            self.entry_score.delete(0, "end")
+            self.entry_date.delete(0, "end")
+            self.entry_coeff.delete(0, "end")
+        except Exception as e:
+            self.status_label.configure(text=f"Error: {str(e)}", text_color="red")
+

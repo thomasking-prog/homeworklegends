@@ -11,23 +11,13 @@ def update_user_rank(session, user):
             if rank.min_points <= user.rank_points < rank.max_points:
                 user.rank = rank
                 break
+    if user.classroom is None:
+        return
 
-    session.refresh(user)
+    update_classroom_rank(session, user.classroom)
 
-def update_rank_points(session, user, new_score):
-    score = new_score / 20.0
-    expected = calculate_expected(user)
-    K = 640
-
-    delta = K * (score - expected)
-    user.rank_points += delta
-
-    update_user_rank(session, user)  # 🔁 inclus ici automatiquement
-
-    if user.classroom:
-        update_classroom_rank(session, user.classroom)
-
-
+def update_rank_points(user, new_score):
+    user.rank_points += calculate_delta(user, new_score)
 
 def calculate_expected(user):
     elo_min = user.rank.min_points
@@ -59,3 +49,32 @@ def update_classroom_rank(session, classroom):
 
     classroom.rank_points_avg = total / count if count > 0 else None
     session.add(classroom)
+
+def calculate_delta(user, score):
+    score_norm = score / 20.0
+    expected = calculate_expected(user)
+    delta = 640 * (score_norm - expected)
+    return delta
+
+def update_user_score(session, user, old_score, new_score):
+    """
+    Met à jour les rank_points de user en retirant l'impact de old_score
+    et en appliquant celui de new_score. Met aussi à jour le rang.
+    """
+    if old_score is not None:
+        delta_old = calculate_delta(user, old_score)
+        user.rank_points -= delta_old
+
+    delta_new = calculate_delta(user, new_score)
+    user.rank_points += delta_new
+
+    update_user_rank(session, user)
+    session.add(user)
+
+def remove_user_score(session, user, score):
+    if score is None:
+        return
+    delta = calculate_delta(user, score)
+    user.rank_points -= delta
+    update_user_rank(session, user)
+    session.add(user)

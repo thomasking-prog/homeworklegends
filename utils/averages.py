@@ -10,7 +10,6 @@ engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
 
 def update_subject_averages(session, user):
-
     for link in user.subject_links:
         subject_id = link.subject_id
 
@@ -41,7 +40,6 @@ def update_subject_averages(session, user):
 
 def update_user_global_average(session, user):
     update_subject_averages(session, user)
-    session.refresh(user)
 
     total = 0
     count = 0
