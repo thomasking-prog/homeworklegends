@@ -17,11 +17,9 @@ PRIORITY_COLOR = {
     "LOW": "green"
 }
 
-class HomeworkWindow(ctk.CTkToplevel):
+class HomeworkView(ctk.CTkFrame):
     def __init__(self, parent, current_user):
         super().__init__(parent)
-        self.title("Homework Management")
-        self.geometry("900x900")
         self.current_user = current_user
         self.session = Session()
 
@@ -30,6 +28,17 @@ class HomeworkWindow(ctk.CTkToplevel):
         # --- to do List devoirs à venir ---
         self.todo_frame = ctk.CTkFrame(self)
         self.todo_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        self.subjects = self.session.query(Subject).join(Subject.followers).filter(
+            User.id == self.current_user.id).all()
+        subject_names = [s.name for s in self.subjects]
+
+        # --- Filtres matières ---
+        subject_names = ["Toutes les matières"] + [s.name for s in self.subjects]
+        self.subject_filter = ctk.CTkOptionMenu(self.todo_frame, values=subject_names,
+                                                command=lambda _: self.load_homework_todo())
+        self.subject_filter.set("Toutes les matières")
+        self.subject_filter.pack(pady=5)
 
         ctk.CTkLabel(self.todo_frame, text="Upcoming Homework ToDo List", font=("Arial", 16)).pack(pady=10)
         self.todo_list_frame = ctk.CTkScrollableFrame(self.todo_frame)
@@ -44,8 +53,12 @@ class HomeworkWindow(ctk.CTkToplevel):
         self.grade_list_frame.pack(fill="both", expand=True)
 
         # --- Création devoir ---
+
+        # === Frame formulaire création ===
         self.create_frame = ctk.CTkFrame(self)
-        self.create_frame.pack(fill="x", padx=10, pady=10)
+        self.create_frame.pack(padx=10, pady=10)
+        self.create_frame.configure(width=400, height=350)
+        self.create_frame.pack_propagate(False)
 
         ctk.CTkLabel(self.create_frame, text="Create Homework", font=("Arial", 16)).grid(row=0, column=0, columnspan=2,
                                                                                          pady=10)
@@ -67,8 +80,10 @@ class HomeworkWindow(ctk.CTkToplevel):
         self.priority_box.set("MEDIUM")
         self.priority_box.grid(row=4, column=1, sticky="ew", pady=5)
 
+
+
         ctk.CTkLabel(self.create_frame, text="Subject:").grid(row=5, column=0, sticky="w")
-        self.subject_box = ctk.CTkComboBox(self.create_frame, values=[])
+        self.subject_box = ctk.CTkComboBox(self.create_frame, values=subject_names)
         self.subject_box.grid(row=5, column=1, sticky="ew", pady=5)
 
         self.btn_submit = ctk.CTkButton(self.create_frame, text="Create Homework", command=self.create_homework)
@@ -79,17 +94,9 @@ class HomeworkWindow(ctk.CTkToplevel):
 
         self.create_frame.columnconfigure(1, weight=1)
 
-        # Charge les sujets
-        self.load_subjects()
-
         # Affiche les listes
         self.load_homework_todo()
         self.load_homework_to_grade()
-
-    def load_subjects(self):
-        user = self.session.query(User).get(self.current_user.id)
-        self.subjects = user.subjects
-        self.subject_box.configure(values=[s.name for s in self.subjects])
 
     def create_homework(self):
         try:
@@ -129,14 +136,24 @@ class HomeworkWindow(ctk.CTkToplevel):
         for widget in self.todo_list_frame.winfo_children():
             widget.destroy()
 
-        homework_list = (
+        selected_subject = self.subject_filter.get()
+        subject_id = None
+        if selected_subject != "Toutes les matières":
+            subject = next((s for s in self.subjects if s.name == selected_subject), None)
+            if subject:
+                subject_id = subject.id
+
+        query = (
             self.session.query(Homework)
             .filter(Homework.user_id == self.current_user.id)
             .filter(Homework.due_date >= date.today())
             .filter(Homework.grade == None)
-            .order_by(Homework.due_date.asc(), Homework.priority.desc())
-            .all()
         )
+
+        if subject_id:
+            query = query.filter(Homework.subject_id == subject_id)
+
+        homework_list = query.order_by(Homework.due_date.asc(), Homework.priority.desc()).all()
 
         if not homework_list:
             ctk.CTkLabel(self.todo_list_frame, text="No upcoming homework.").pack(pady=10)
@@ -147,10 +164,17 @@ class HomeworkWindow(ctk.CTkToplevel):
             frame.pack(fill="x", pady=5, padx=5)
 
             priority_color = PRIORITY_COLOR[hw.priority.name]
-
-            info = f"{hw.title} - {hw.subject.name} | Due: {hw.due_date}"
+            days_remaining = (hw.due_date - date.today()).days
+            info = f"{hw.title} - {hw.subject.name} | Due in {days_remaining} day{'s' if days_remaining != 1 else ''}"
             label = ctk.CTkLabel(frame, text=info, text_color=priority_color, font=("Arial", 13))
-            label.pack(anchor="w", padx=10, pady=5)
+            label.pack(side="left", anchor="w", padx=10, pady=5)
+
+            btn_edit = ctk.CTkButton(frame, text="Edit", width=60, command=lambda hw=hw: self.open_edit_homework(hw))
+            btn_edit.pack(side="right", padx=10)
+
+            btn_delete = ctk.CTkButton(frame, text="Delete", width=60, fg_color="red",
+                                       command=lambda hw=hw: self.delete_homework(hw))
+            btn_delete.pack(side="right", padx=10)
 
     def load_homework_to_grade(self):
         for widget in self.grade_list_frame.winfo_children():
@@ -204,3 +228,67 @@ class HomeworkWindow(ctk.CTkToplevel):
         except Exception as e:
             entry_widget.delete(0, "end")
             entry_widget.configure(placeholder_text=str(e))
+
+    def delete_homework(self, homework):
+        try:
+            self.session.delete(self.session.merge(homework))
+            self.session.commit()
+            self.load_homework_todo()  # Rafraîchit la liste
+        except Exception as e:
+            print(f"Error deleting homework: {e}")
+
+    def open_edit_homework(self, homework):
+        edit_win = ctk.CTkToplevel(self)
+        edit_win.title("Edit Homework")
+        edit_win.geometry("400x400")
+
+        # Champs du formulaire pré-remplis
+        ctk.CTkLabel(edit_win, text="Title:").pack(pady=5)
+        entry_title = ctk.CTkEntry(edit_win)
+        entry_title.insert(0, homework.title)
+        entry_title.pack(pady=5)
+
+        ctk.CTkLabel(edit_win, text="Description:").pack(pady=5)
+        entry_desc = ctk.CTkTextbox(edit_win, height=80)
+        entry_desc.insert("0.0", homework.description or "")
+        entry_desc.pack(pady=5)
+
+        ctk.CTkLabel(edit_win, text="Due Date (YYYY-MM-DD):").pack(pady=5)
+        entry_due = ctk.CTkEntry(edit_win)
+        entry_due.insert(0, str(homework.due_date))
+        entry_due.pack(pady=5)
+
+        ctk.CTkLabel(edit_win, text="Priority:").pack(pady=5)
+        priority_box = ctk.CTkOptionMenu(edit_win, values=["LOW", "MEDIUM", "HIGH"])
+        priority_box.set(homework.priority.name)
+        priority_box.pack(pady=5)
+
+        # Optionnel: Subject dropdown si tu veux modifier la matière
+        # subjects = self.session.query(Subject).all()
+        # subject_names = [s.name for s in subjects]
+        # subject_dropdown = ctk.CTkOptionMenu(edit_win, values=subject_names)
+        # subject_dropdown.set(homework.subject.name if homework.subject else subject_names[0])
+        # subject_dropdown.pack(pady=5)
+
+        def save_changes():
+            try:
+                homework.title = entry_title.get().strip()
+                homework.description = entry_desc.get("0.0", "end").strip()
+                homework.due_date = datetime.strptime(entry_due.get(), "%Y-%m-%d").date()
+                homework.priority = PriorityEnum[priority_box.get()]
+
+                # Si gestion matière modifiable :
+                # subject_name = subject_dropdown.get()
+                # subject = next((s for s in subjects if s.name == subject_name), None)
+                # if subject:
+                #     homework.subject_id = subject.id
+
+                self.session.commit()
+                edit_win.destroy()
+                self.load_homework_todo()  # ou ta méthode de rafraîchissement
+            except Exception as e:
+                # Gestion erreur simple
+                ctk.CTkLabel(edit_win, text=f"Error: {str(e)}", text_color="red").pack()
+
+        ctk.CTkButton(edit_win, text="Save", command=save_changes).pack(pady=20)
+

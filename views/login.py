@@ -6,7 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from config import DATABASE_URL
 from models.user import User
-from views.dashboard import Dashboard
+from views.new_dashboard import MainApp
 from views.register import RegisterWindow
 
 engine = create_engine(DATABASE_URL)
@@ -64,13 +64,16 @@ class LoginWindow(ctk.CTk):
             return
 
         self.status_label.configure(text="Login successful!", text_color="green")
-
-        # Placeholder : future dashboard redirection
         print(f"Logged in as {user.username} with role {user.role.value}")
-        # self.destroy() / open Dashboard later
 
-        self.status_label.configure(text="Login successful!", text_color="green")
+        # 👉 Crée et ouvre le dashboard principal
+        dashboard = MainApp(user, self)
 
-        # Open Dashboard and pass self
-        dashboard = Dashboard(user, self)
-        self.withdraw()  # cache la fenêtre login
+        # 👉 Ferme ou cache la fenêtre login
+        self.withdraw()
+
+        # ✅ Attendre que MainApp se ferme
+        dashboard.mainloop()
+
+        # 👉 Quand dashboard se ferme, réaffiche login
+        self.deiconify()

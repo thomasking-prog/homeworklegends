@@ -1,2 +1,2 @@
-from .homeworks import HomeworkWindow
-from .evaluations import EvaluationWindow
+from .homeworks import HomeworkView
+from .evaluations import EvaluationView

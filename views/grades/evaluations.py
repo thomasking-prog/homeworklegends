@@ -12,11 +12,9 @@ from models.subject import Subject
 engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
 
-class EvaluationWindow(ctk.CTkToplevel):
+class EvaluationView(ctk.CTkFrame):
     def __init__(self, parent, current_user):
         super().__init__(parent)
-        self.title("Evaluations")
-        self.geometry("900x700")
         self.current_user = current_user
         self.session = Session()
 
@@ -44,7 +42,9 @@ class EvaluationWindow(ctk.CTkToplevel):
 
         # === Frame formulaire création ===
         self.form_frame = ctk.CTkFrame(self)
-        self.form_frame.pack(fill="x", padx=10, pady=10)
+        self.form_frame.pack(padx=10, pady=10)
+        self.form_frame.configure(width=400, height=350)
+        self.form_frame.pack_propagate(False)
 
         # Form fields
         self.label_label = ctk.CTkLabel(self.form_frame, text="Label:")

@@ -34,10 +34,12 @@ def calculate_expected(user):
     expected = 0.4 + (points - elo_min) / (elo_max - elo_min) * 0.4
     return expected
 
+
 def update_classroom_rank(session, classroom):
-    users = classroom.users  # ou classroom.members selon ta relation
+    users = classroom.users
     if not users:
         classroom.rank_points_avg = None
+        classroom.rank_id = None
         return
 
     total = 0
@@ -47,7 +49,17 @@ def update_classroom_rank(session, classroom):
             total += user.rank_points
             count += 1
 
-    classroom.rank_points_avg = total / count if count > 0 else None
+    if count == 0:
+        classroom.rank_points_avg = None
+        classroom.rank_id = None
+    else:
+        avg = total / count
+        classroom.rank_points_avg = avg
+
+        # On récupère le rang le plus bas qui dépasse la moyenne
+        rank = session.query(Rank).filter(Rank.min_points <= avg).order_by(Rank.min_points.desc()).first()
+        classroom.rank_id = rank.id if rank else None
+
     session.add(classroom)
 
 def calculate_delta(user, score):
