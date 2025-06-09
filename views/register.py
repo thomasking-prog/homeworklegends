@@ -6,7 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from config import DATABASE_URL
 from models.user import User, RoleEnum
-from views.dashboard import Dashboard
+from views.new_dashboard import MainApp
 
 engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
@@ -82,6 +82,6 @@ class RegisterWindow(ctk.CTk):
         session.commit()
 
         # Auto-login : ouvrir le dashboard
-        Dashboard(user, self.parent_login)
-        self.parent_login.withdraw()
+        dashboard = MainApp(user, self.parent_login)
         self.destroy()
+        dashboard.mainloop()

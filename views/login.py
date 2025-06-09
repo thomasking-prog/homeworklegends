@@ -47,6 +47,7 @@ class LoginWindow(ctk.CTk):
             register_window.destroy()
 
         register_window.protocol("WM_DELETE_WINDOW", on_close)
+        register_window.mainloop()  # <-- Ajoute cette ligne
 
     def login(self):
         session = Session()
