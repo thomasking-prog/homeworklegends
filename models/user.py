@@ -1,8 +1,9 @@
 # models/user.py
 
+import enum
+
 from sqlalchemy import Column, Integer, Float, String, Enum, ForeignKey
 from sqlalchemy.orm import declarative_base, relationship
-import enum
 
 Base = declarative_base()
 
