@@ -23,10 +23,14 @@ class HomeworkView(ctk.CTkFrame):
         self.current_user = current_user
         self.session = Session()
 
+        # Frame scrollable globale
+        self.main_scroll = ctk.CTkScrollableFrame(self)
+        self.main_scroll.pack(fill="both", expand=True, padx=10, pady=10)
+
 
 
         # --- to do List devoirs à venir ---
-        self.todo_frame = ctk.CTkFrame(self)
+        self.todo_frame = ctk.CTkFrame(self.main_scroll)
         self.todo_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
         self.subjects = self.session.query(Subject).join(Subject.followers).filter(
@@ -45,7 +49,7 @@ class HomeworkView(ctk.CTkFrame):
         self.todo_list_frame.pack(fill="both", expand=True)
 
         # --- Liste devoirs à noter ---
-        self.grade_frame = ctk.CTkFrame(self)
+        self.grade_frame = ctk.CTkFrame(self.main_scroll)
         self.grade_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
         ctk.CTkLabel(self.grade_frame, text="Homework to Grade", font=("Arial", 16)).pack(pady=10)
@@ -55,7 +59,7 @@ class HomeworkView(ctk.CTkFrame):
         # --- Création devoir ---
 
         # === Frame formulaire création ===
-        self.create_frame = ctk.CTkFrame(self)
+        self.create_frame = ctk.CTkFrame(self.main_scroll)
         self.create_frame.pack(padx=10, pady=10)
         self.create_frame.configure(width=400, height=350)
         self.create_frame.pack_propagate(False)

@@ -45,21 +45,21 @@ def init_db():
     rank_bronze = session.query(Rank).filter_by(name="Bronze").first()
 
     class_alpha = Classroom(
-        name="Classe Alpha",
+        name="SIAP-2",
         description="Classe expérimentée",
         rank_points_avg=2800,
         rank=rank_platine
     )
 
     class_beta = Classroom(
-        name="Classe Beta",
+        name="STS-2",
         description="Classe intermédiaire",
         rank_points_avg=2400,
         rank=rank_or
     )
 
     class_gamma = Classroom(
-        name="Classe Gamma",
+        name="SIAP-1",
         description="Nouvelle promotion",
         rank_points_avg=1800,
         rank=rank_bronze
